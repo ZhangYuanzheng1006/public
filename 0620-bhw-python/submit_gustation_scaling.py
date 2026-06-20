@@ -11,7 +11,7 @@ import requests
 
 TASK_NAME = "0620 bHW scaling exponents Python CPU direct"
 DEFAULT_IMAGE = "docker://pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime"
-DEFAULT_OUT_DIR = "/data/magnus/0620_bhw_scaling_exponents"
+DEFAULT_OUT_DIR = "/home/magnus/data/0620_bhw_scaling_exponents"
 DEFAULT_REPO_ZIP = "https://github.com/ZhangYuanzheng1006/public/archive/refs/heads/main.zip"
 
 
@@ -107,9 +107,10 @@ echo '{{"status":"success","out_dir":"{out_dir}","task":"compute_scaling_exponen
 
 def build_system_entry_command() -> str:
     return """
-mounts=("/data:/data")
+mounts=("/home/magnus/data:/home/magnus/data")
 export APPTAINER_BIND=$(IFS=,; echo "${mounts[*]}")
 export MAGNUS_HOME=/magnus
+mkdir -p /home/magnus/data 2>/dev/null || true
 unset -f nvidia-smi || true
 unset VIRTUAL_ENV SSL_CERT_FILE
 """.strip()

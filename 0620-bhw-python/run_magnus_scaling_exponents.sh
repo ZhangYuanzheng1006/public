@@ -8,7 +8,7 @@ export NUMEXPR_NUM_THREADS=1
 export MPLBACKEND=Agg
 
 WORKDIR="${WORKDIR:-/tmp/0620-bhw-python}"
-OUT_DIR="${OUT_DIR:-/data/magnus/0620_bhw_scaling_exponents}"
+OUT_DIR="${OUT_DIR:-/home/magnus/data/0620_bhw_scaling_exponents}"
 REPO_URL="${REPO_URL:-https://github.com/ZhangYuanzheng1006/public.git}"
 SUBDIR="${SUBDIR:-0620-bhw-python}"
 
