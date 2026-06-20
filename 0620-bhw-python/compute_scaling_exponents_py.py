@@ -82,8 +82,9 @@ def make_cases(base: BHWParams, out_dir: Path, k_min: float, k_max: float) -> li
 def plot_spectra(results: list[dict], scan: str, out_dir: Path, k_min: float, k_max: float) -> None:
     rows = sorted([r for r in results if r["scan"] == scan], key=lambda x: x["value"])
     fig, ax = plt.subplots(figsize=(9, 7))
+    param_label = r"\alpha" if scan == "alpha" else r"\kappa"
     for row in rows:
-        ax.loglog(row["k"], row["Ek"], lw=1.5, label=fr"${'\\alpha' if scan == 'alpha' else '\\kappa'}={row['value']:.3g}$")
+        ax.loglog(row["k"], row["Ek"], lw=1.5, label=fr"${param_label}={row['value']:.3g}$")
     k_ref = np.logspace(np.log10(0.3), np.log10(3.0), 20)
     ax.loglog(k_ref, 1e-3 * k_ref ** -3, "k--", lw=1.2, label=r"$k^{-3}$")
     ax.axvspan(k_min, k_max, color="0.85", alpha=0.35, label="fit range")
