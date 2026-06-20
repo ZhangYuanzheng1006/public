@@ -16,7 +16,8 @@ rm -rf "$WORKDIR"
 git clone --depth 1 "$REPO_URL" "$WORKDIR"
 cd "$WORKDIR/$SUBDIR"
 
-python3 -m pip install --user -r requirements_py.txt
+python3 -m pip install --user "numpy>=1.24" "matplotlib>=3.7"
+python3 -m pip install --user "pyfftw>=0.13" || echo "pyfftw install failed; falling back to numpy.fft"
 python3 compute_scaling_exponents_py.py \
   --mode production \
   --workers "${WORKERS:-4}" \
