@@ -11,7 +11,7 @@ import requests
 
 TASK_NAME = "0620 bHW scaling exponents Python CPU direct"
 DEFAULT_IMAGE = "docker://pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime"
-DEFAULT_OUT_DIR = "/home/magnus/data/0620_bhw_scaling_exponents"
+DEFAULT_OUT_DIR = "/magnus/workspace/0620_bhw_scaling_exponents"
 DEFAULT_REPO_ZIP = "https://github.com/ZhangYuanzheng1006/public/archive/refs/heads/main.zip"
 
 
@@ -97,29 +97,34 @@ with zipfile.ZipFile(zip_path) as zf:
     zf.extractall(extract_root)
 PY
 cd /tmp/public-main/0620-bhw-python
-python3 -m pip install --user -i https://pypi.tuna.tsinghua.edu.cn/simple 'numpy>=1.24' 'matplotlib>=3.7'
+export PATH="$HOME/.local/bin:$PATH"
+python3 -m pip install --user -i https://pypi.tuna.tsinghua.edu.cn/simple 'magnus-sdk>=0.6.0' 'numpy>=1.24' 'matplotlib>=3.7'
 python3 -m pip install --user -i https://pypi.tuna.tsinghua.edu.cn/simple 'pyfftw>=0.13' || echo 'pyfftw install failed; falling back to numpy.fft' | tee -a "$OUT_DIR/run_status.log"
 python3 compute_scaling_exponents_py.py --mode production --workers "$WORKERS" --fftw-threads "$FFTW_THREADS" --out-dir "$OUT_DIR" 2>&1 | tee -a "$OUT_DIR/run_status.log"
 echo "Finished bHW scaling exponent run at $(date -Is)" | tee -a "$OUT_DIR/run_status.log"
-echo '{{"status":"success","out_dir":"{out_dir}","task":"compute_scaling_exponents"}}' > "$MAGNUS_RESULT"
+SECRET=$(magnus custody "$OUT_DIR" --expire-minutes 1440 --max-downloads 10 | grep -o 'magnus-secret:[^ ]*' | tail -n 1)
+if [ -z "$SECRET" ]; then
+  echo "Failed to custody output directory" >&2
+  exit 4
+fi
+echo "magnus receive $SECRET --output ./0620_bhw_scaling_exponents" > "$MAGNUS_ACTION"
+echo '{{"status":"success","output_secret":"'"$SECRET"'","download_command":"magnus receive '"$SECRET"' --output ./0620_bhw_scaling_exponents","workspace_out_dir":"{out_dir}","task":"compute_scaling_exponents"}}' > "$MAGNUS_RESULT"
 """.strip()
 
 
 def build_system_entry_command() -> str:
     return """
-mounts=("/home/magnus/data:/home/magnus/data")
-export APPTAINER_BIND=$(IFS=,; echo "${mounts[*]}")
 export MAGNUS_HOME=/magnus
-mkdir -p /home/magnus/data 2>/dev/null || true
 unset -f nvidia-smi || true
 unset VIRTUAL_ENV SSL_CERT_FILE
 """.strip()
 
 
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
+    entry_command = build_storage_probe_command() if args.storage_probe else build_entry_command(args.repo_zip, args.out_dir, args.workers, args.fftw_threads)
     return {
         "task_name": args.task_name,
-        "entry_command": build_entry_command(args.repo_zip, args.out_dir, args.workers, args.fftw_threads),
+        "entry_command": entry_command,
         "repo_name": "magnus",
         "branch": "main",
         "commit_sha": "9019705e964d728c461b8e8e8a771d5a53ea8c62",
@@ -129,7 +134,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "job_type": args.job_type,
         "description": (
             "Direct requests POST to Gustation /api/jobs/submit. CPU-only optimized Python run "
-            "for compute_scaling_exponents.m from GitHub zip. Outputs persist under " + args.out_dir
+            "for compute_scaling_exponents.m from GitHub zip. Outputs are uploaded with FileSecret from " + args.out_dir
         ),
         "container_image": args.container_image,
         "cpu_count": args.cpu_count,
@@ -157,7 +162,43 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--verify-ssl", action="store_true", help="Enable TLS verification. Default is disabled for GU compatibility.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true", help="Submit even if an active same-name job exists.")
+    parser.add_argument("--storage-probe", action="store_true", help="Submit a tiny job that probes writable mounted directories.")
     return parser.parse_args()
+
+
+def build_storage_probe_command() -> str:
+    return r'''
+set -euo pipefail
+echo "=== identity ==="
+id || true
+whoami || true
+echo "=== mounts ==="
+mount | grep -E '/home/magnus|/data|/magnus/workspace' || true
+echo "=== path permissions ==="
+for p in /home /home/magnus /home/magnus/data /home/magnus/data/optics_agent /home/magnus/data/optics_agent/comsol /home/magnus/data/optics_agent/comsol/runs /data /data/public /data/public/zhangyuanzheng /magnus/workspace /tmp; do
+  if [ -e "$p" ]; then
+    ls -ld "$p" || true
+  else
+    echo "MISSING $p"
+  fi
+done
+echo "=== write tests ==="
+for p in /home/magnus/data /home/magnus/data/optics_agent /home/magnus/data/optics_agent/comsol/runs /data/public/zhangyuanzheng /magnus/workspace /tmp; do
+  echo "-- $p"
+  if [ -d "$p" ]; then
+    test_dir="$p/.__bhw_probe_${MAGNUS_JOB_ID:-manual}"
+    if mkdir -p "$test_dir" 2>/tmp/probe_err; then
+      echo "WRITE_OK $test_dir"
+      rmdir "$test_dir" || true
+    else
+      echo "WRITE_FAIL $p: $(cat /tmp/probe_err)"
+    fi
+  else
+    echo "NOT_DIR $p"
+  fi
+done
+printf '{"success": true, "kind": "storage_probe"}\n' > "$MAGNUS_RESULT"
+'''.strip()
 
 
 def main() -> int:

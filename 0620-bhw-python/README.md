@@ -14,4 +14,4 @@ python compute_scaling_exponents_py.py --mode quick --workers 1 --fftw-threads 1
 WORKERS=4 FFTW_THREADS=14 bash run_magnus_scaling_exponents.sh
 ```
 
-The production run executes eight cases: four alpha values and four kappa values. Outputs are CSV, JSON and PNG files under `OUT_DIR`; on Magnus use `/home/magnus/data/0620_bhw_scaling_exponents` because it is the mounted persistent output area for jobs.
+The production run executes eight cases: four alpha values and four kappa values. Outputs are CSV, JSON and PNG files under `OUT_DIR`. On Magnus, outputs are staged under `/magnus/workspace/0620_bhw_scaling_exponents`, uploaded with `magnus custody`, and exposed through `MAGNUS_ACTION` as a `magnus receive ...` command.
